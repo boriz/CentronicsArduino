@@ -18,16 +18,19 @@ byte data = 0;
 byte buff[512];
 int buff_index = 0;
 long last_update;
-File dataFile;
+File current_file;
 
 
 void setup() 
 {
   Serial.begin(115200);
   delay(100);
-  
+
+  // Initialize SD card
   Serial.println("Init SD");
-  if (!SD.begin(4)) 
+  pinMode(53, OUTPUT);  // HW CS pin, init it just in case
+  pinMode(4, OUTPUT);
+  if ( !SD.begin(4) ) 
   {
     Serial.println("SD Init Failed");
   }
@@ -61,12 +64,11 @@ void setup()
   pinMode(45, INPUT_PULLUP);  // D3
   pinMode(47, INPUT_PULLUP);  // D4
   pinMode(49, INPUT_PULLUP);  // D5
-  pinMode(51, INPUT_PULLUP);  // D6
-  pinMode(53, INPUT_PULLUP);  // D7
+  pinMode(46, INPUT_PULLUP);  // D6
+  pinMode(48, INPUT_PULLUP);  // D7
 
   // Update timeout
   last_update = millis();
-  
   Serial.println("Init Complete");
 }
 
@@ -75,6 +77,13 @@ void loop()
 {
   if (data_ready)
   {
+    // Receive byte
+    buff[buff_index] = data;
+    buff_index++;
+
+    // Reset data ready flag
+    data_ready = false;
+    
     // Ack byte, reset busy
     digitalWrite(30, false);  // ACK
     delayMicroseconds(7);
@@ -82,18 +91,16 @@ void loop()
     delayMicroseconds(5);
     digitalWrite(30, true);   // ACK
 
-    Serial.print("Got byte: ");
-    Serial.println(data);
-    buff[buff_index] = data;
-    buff_index++;
-
-    // Reset data ready flag
-    data_ready = false;
-
     // Reset timeout
     last_update = millis();
 
-    // Actively printing
+    // Actively printing?
+    if (!print_in_progress)
+    {
+      // Just started printing. Create new file
+      CreateNewFile();
+      Serial.print("Receiving from printer.");
+    }
     print_in_progress = true;
   }
 
@@ -101,7 +108,7 @@ void loop()
   if(buff_index >= 512)
   {
     // Flush buffer to file
-    Serial.println("Flushing buffer to file");
+    Serial.print(".");
     WriteToFile(buff, sizeof(buff));    
     buff_index = 0;
   }
@@ -109,61 +116,50 @@ void loop()
   if ( print_in_progress && (millis() > (last_update + 1000)) )
   {
     // Timeout. Flush the buffer to file
-    Serial.println("Timeout. Closing the file");
     if (buff_index > 0)
     {
       WriteToFile(buff, buff_index - 1);
       buff_index = 0;
     }
-    dataFile.close();
+    Serial.println(".Done");
+    Serial.print("Closing file..");
+    current_file.close();
+    Serial.println("..Ok");
     print_in_progress = false;
-  }
+  } 
+}
 
-  // TODO: Create new file each time
-/*
-  while (true) 
+
+void CreateNewFile()
+{  
+  // Find unique file 
+  char fname[30];  
+  int i = 1;  
+  do
   {
-    File entry =  dir.openNextFile();
-    if (!entry) 
-    {
-      // no more files
-      break;
-    }
-    Serial.print(entry.name());
-    if (entry.isDirectory()) 
-    {
-      Serial.println("/");
-      printDirectory(entry, numTabs + 1);
-    } 
-    else 
-    {
-      // files have sizes, directories do not
-      Serial.print("\t\t");
-      Serial.println(entry.size(), DEC);
-    }
-    entry.close();
-  }
-*/
-  
+    sprintf (fname, "sa%03d.plt", i);
+    i++;
+  } while(SD.exists(fname));
+
+  // Found new file
+  Serial.println();
+  current_file = SD.open(fname, FILE_WRITE);
+  Serial.print("New file created: ");
+  Serial.println(fname);
 }
 
 
 void WriteToFile(byte* b, int b_size)
 {
-  // Flush buffer to file
-  if (!dataFile)
+  // Verify that the file is open
+  if (current_file) 
   {
-    // Create file
-    dataFile = SD.open("out.prn", FILE_WRITE);
-  }
-  
-  if (dataFile) 
-  {
-    dataFile.write(b, b_size);
+    current_file.write(b, b_size);
   }
   else 
   {
-    Serial.println("Can't open file");
+    Serial.println();
+    Serial.println("Can't write to file");
   }
 }
 
@@ -175,14 +171,14 @@ void StrobeFallingEdge()
     digitalWrite(28, true);
 
     // Read data from port
-    byte data = (digitalRead(39) << 0) | 
-                (digitalRead(41) << 1) | 
-                (digitalRead(43) << 2) | 
-                (digitalRead(45) << 3) |
-                (digitalRead(47) << 4) |
-                (digitalRead(49) << 5) |
-                (digitalRead(51) << 6) |
-                (digitalRead(53) << 7);
+    data = (digitalRead(39) << 0) | 
+           (digitalRead(41) << 1) | 
+           (digitalRead(43) << 2) | 
+           (digitalRead(45) << 3) |
+           (digitalRead(47) << 4) |
+           (digitalRead(49) << 5) |
+           (digitalRead(46) << 6) |
+           (digitalRead(48) << 7);
 
     // Set ready bit
     data_ready = true;    
