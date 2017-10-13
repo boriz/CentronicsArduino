@@ -6,12 +6,17 @@
 // CLK:  pin 13
 // CS:   pin 4
 
+// LCD pinout:
+// EN: pin A7
 
+#include <LiquidCrystal.h>
 #include <SPI.h>
 #include <SD.h>
 
 
 // Global variables/flags
+LiquidCrystal lcd(8, 9, 4, 5, 6, 7);  // RS, EN, D4, D5, D6, D7
+bool init_complete = false;
 bool print_in_progress = false;
 bool data_ready = false;
 byte data = 0;
@@ -19,13 +24,21 @@ byte buff[512];
 int buff_index = 0;
 long last_update;
 File current_file;
+long file_size = 0;
 
 
 void setup() 
 {
   Serial.begin(115200);
-  delay(100);
-
+  delay(10);
+  Serial.println();
+  Serial.println();
+  Serial.println();
+  
+  lcd.begin(16, 2);  
+  delay(10);
+  lcd.clear();  
+  
   // Initialize SD card
   Serial.println("Init SD");
   pinMode(53, OUTPUT);  // HW CS pin, init it just in case
@@ -33,16 +46,18 @@ void setup()
   if ( !SD.begin(4) ) 
   {
     Serial.println("SD Init Failed");
+    lcd.print("! No SD card !");
   }
   else
   {
     Serial.println("SD Init Ok");
+    lcd.print("--== Ready ==--");
   }
   
   // Configure pins
   pinMode(18, INPUT_PULLUP); // Strobe - normally high
-  attachInterrupt(digitalPinToInterrupt(18), StrobeFallingEdge, FALLING);
-
+  attachInterrupt(digitalPinToInterrupt(18), StrobeFallingEdge, FALLING); // Attach to pin interrupt
+  
   pinMode(22, OUTPUT);  // Error - normally high
   digitalWrite(22, true);
 
@@ -66,10 +81,11 @@ void setup()
   pinMode(49, INPUT_PULLUP);  // D5
   pinMode(46, INPUT_PULLUP);  // D6
   pinMode(48, INPUT_PULLUP);  // D7
-
+    
   // Update timeout
   last_update = millis();
   Serial.println("Init Complete");
+  init_complete = true;
 }
 
 
@@ -100,6 +116,12 @@ void loop()
       // Just started printing. Create new file
       CreateNewFile();
       Serial.print("Receiving from printer.");
+      file_size = 0;
+
+      // Update LCD
+      lcd.clear();
+      lcd.print("Prn to:");
+      lcd.print(current_file.name());      
     }
     print_in_progress = true;
   }
@@ -109,8 +131,15 @@ void loop()
   {
     // Flush buffer to file
     Serial.print(".");
-    WriteToFile(buff, sizeof(buff));    
-    buff_index = 0;
+    WriteToFile(buff, sizeof(buff));
+    file_size += buff_index - 1;
+    buff_index = 0;    
+
+    // Update LCD
+    lcd.setCursor(0, 1);
+    lcd.print("Size:");
+    lcd.print(file_size);
+    lcd.print("B");
   }
   
   if ( print_in_progress && (millis() > (last_update + 1000)) )
@@ -119,6 +148,7 @@ void loop()
     if (buff_index > 0)
     {
       WriteToFile(buff, buff_index - 1);
+      file_size += buff_index - 1;
       buff_index = 0;
     }
     Serial.println(".Done");
@@ -126,6 +156,11 @@ void loop()
     current_file.close();
     Serial.println("..Ok");
     print_in_progress = false;
+
+    // Update LCD
+    lcd.clear();
+    lcd.print("Done: ");
+    lcd.print(current_file.name());
   } 
 }
 
@@ -167,20 +202,26 @@ void WriteToFile(byte* b, int b_size)
 // Strobe pin on falling edge interrupt
 void StrobeFallingEdge()
 {
-    // Set busy signal
-    digitalWrite(28, true);
-
-    // Read data from port
-    data = (digitalRead(39) << 0) | 
-           (digitalRead(41) << 1) | 
-           (digitalRead(43) << 2) | 
-           (digitalRead(45) << 3) |
-           (digitalRead(47) << 4) |
-           (digitalRead(49) << 5) |
-           (digitalRead(46) << 6) |
-           (digitalRead(48) << 7);
-
-    // Set ready bit
-    data_ready = true;    
+  // Be sure that init sequence is completed
+    if (!init_complete)
+    {
+      return;
+    }
+    
+  // Set busy signal
+  digitalWrite(28, true);
+  
+  // Read data from port
+  data = (digitalRead(39) << 0) | 
+         (digitalRead(41) << 1) | 
+         (digitalRead(43) << 2) | 
+         (digitalRead(45) << 3) |
+         (digitalRead(47) << 4) |
+         (digitalRead(49) << 5) |
+         (digitalRead(46) << 6) |
+         (digitalRead(48) << 7);
+  
+  // Set ready bit
+  data_ready = true;    
 }
 
