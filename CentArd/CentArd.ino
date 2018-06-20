@@ -13,6 +13,8 @@
 #include <SPI.h>
 #include <SD.h>
 
+// 10s timeout before considering the print completed
+#define TIMEOUT_MS 10000
 
 // Global variables/flags
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);  // RS, EN, D4, D5, D6, D7
@@ -141,8 +143,9 @@ void loop()
     lcd.print(file_size);
     lcd.print("B");
   }
-  
-  if ( print_in_progress && (millis() > (last_update + 1000)) )
+
+  // Timeout
+  if ( print_in_progress && (millis() > (last_update + TIMEOUT_MS)) )
   {
     // Timeout. Flush the buffer to file
     if (buff_index > 0)
@@ -172,7 +175,7 @@ void CreateNewFile()
   int i = 1;  
   do
   {
-    sprintf (fname, "sa%03d.plt", i);
+    sprintf (fname, "sa%03d.prn", i);
     i++;
   } while(SD.exists(fname));
 
