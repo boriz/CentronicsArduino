@@ -35,21 +35,34 @@ Here are a few pictures on the shields stackup:
 
 ## Parallel interface
 Centronics parallel interface is pretty old and it was well documented in nineties, so it was easy to figure out how to connect Arduino to it.
-* Strobe: pin 18, input, pullup enabled, attached to the falling edge interrupt
-* Error: pin 22, output, normally high
-* Select: pin 24, output, normally high
-* Paper out: pin 26, output, normally high
-* Busy: pin 28, output, normally low
-* Ack: pin 30, output, output, normally high
-* D0: pin 39, input, pullup enabled
-* D1: pin 41, input, pullup enabled
-* D2: pin 43, input, pullup enabled
-* D3: pin 45, input, pullup enabled
-* D4: pin 47, input, pullup enabled
-* D5: pin 49, input, pullup enabled
-* D6: pin 46, input, pullup enabled
-* D7: pin 48, input, pullup enabled
+
+| Name      | Centronics pin. DB25 connector | Arduino pin | Arduino pin direction | Notes                                                                     |
+|-----------|--------------------------------|-------------|-----------------------|---------------------------------------------------------------------------|
+| Strobe    | 1                              | pin 18      | Input                 | Pullup enabled. Attached to falling edge interrupt.                       |
+| Error     | 15                             | pin 22      | Output                | Not used. Forced high.                                                    |
+| Select    | 13                             | pin 24      | Output                | Not used. Forced high.                                                    |
+| Paper Out | 12                             | pin 26      | Output                | Not used. Forced high.                                                    |
+| Busy      | 11                             | pin 28      | Output                | Set high on the falling edge of Strobe. Set low after acknowledging data. |
+| Ack       | 10                             | pin 30      | Output                | Generate falling edge to acknowledge data.                                |
+| D0        | 2                              | pin 39      | Input                 | Parallel data.                                                            |
+| D1        | 3                              | pin 41      | Input                 | Parallel data.                                                            |
+| D2        | 4                              | pin 43      | Input                 | Parallel data.                                                            |
+| D3        | 5                              | pin 45      | Input                 | Parallel data.                                                            |
+| D4        | 6                              | pin 47      | Input                 | Parallel data.                                                            |
+| D5        | 7                              | pin 49      | Input                 | Parallel data.                                                            |
+| D6        | 8                              | pin 46      | Input                 | Parallel data.                                                            |
+| D7        | 9                              | pin 48      | Input                 | Parallel data.                                                            |
 
 ## How to use it
-Configure your instrument to use parallel port for printing. Configure printer type. The device saves whatever it sees on the parallel port to the file on the SD card, so we should probably select a printer with standard protocol. One of the option is usually "HP PaintJet" printer.
+Insert SD card and press reset button on the Arduino. It should dispaly "Ready" message on the LCD.
+Configure your instrument to use Centronics (parallel port) for printing. 
+Configure printer type. The device saves whatever it sees on the parallel port to the file on the SD card, so we should probably select a printer with standard protocol. 
+* HP 54522A oscilloscope. Select "HP 7470A" plotter. The output would be a standard HP-GL format.
+* Tektronix TDS2024 scope. Configure "RLE" format. You can open these files with MS Paint
+* HP 8594E spectrum analyzer. Select Plotter ("PLT") option. The output would be a standard HP-GL format.
+Press "Print" (or "Copy") button, wait for "Done" message on the device LCD.
 
+To view HP_GL files I am using free and open-source [HP-GL Viewer](http://service-hpglview.web.cern.ch/service-hpglview/download_index.html) from CERN. But you should be able to use any other HP-GL viewers, including [HP 7470A Emulator](http://www.ke5fx.com/gpib/7470.htm) I mentioned above.
+RLE is a standard bitmap, you should be able to open it with Microsoft Paint or any other graphic editor.
+
+Here is a quick demonstration video: https://youtu.be/vRhbX8HyUxA
